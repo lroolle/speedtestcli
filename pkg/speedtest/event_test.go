@@ -98,6 +98,54 @@ func TestTaggedSink_Nil(t *testing.T) {
 	}
 }
 
+func TestRedactProxyURL_NoAuth(t *testing.T) {
+	got := RedactProxyURL("http://proxy.example.com:8080")
+	if got != "http://proxy.example.com:8080" {
+		t.Errorf("expected no change, got %q", got)
+	}
+}
+
+func TestRedactProxyURL_WithAuth(t *testing.T) {
+	got := RedactProxyURL("http://admin:s3cret@proxy.corp.com:8080")
+	if got == "" {
+		t.Fatal("expected non-empty result")
+	}
+	if contains(got, "admin") || contains(got, "s3cret") {
+		t.Errorf("credentials should be redacted, got %q", got)
+	}
+	if !contains(got, "proxy.corp.com:8080") {
+		t.Errorf("host should be preserved, got %q", got)
+	}
+}
+
+func TestRedactProxyURL_Empty(t *testing.T) {
+	got := RedactProxyURL("")
+	if got != "" {
+		t.Errorf("expected empty, got %q", got)
+	}
+}
+
+func TestRedactProxyURL_Malformed(t *testing.T) {
+	got := RedactProxyURL("://not-a-url")
+	if got != "[set]" {
+		t.Errorf("expected '[set]', got %q", got)
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		(len(s) > 0 && len(substr) > 0 && stringContains(s, substr)))
+}
+
+func stringContains(s, sub string) bool {
+	for i := 0; i <= len(s)-len(sub); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}
+
 func TestGenerateID(t *testing.T) {
 	id := GenerateID()
 	if len(id) != 32 {

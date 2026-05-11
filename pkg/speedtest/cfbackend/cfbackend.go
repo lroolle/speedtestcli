@@ -31,7 +31,7 @@ func New(opts ...Option) *Backend {
 }
 
 func (b *Backend) Name() string        { return "cloudflare" }
-func (b *Backend) Granularity() string  { return "per-sample" }
+func (b *Backend) Granularity() string { return "per-sample" }
 
 func (b *Backend) FetchMeta(ctx context.Context) (*speedtest.ConnectionInfo, error) {
 	return fetchMeta(ctx, b.client, b.baseURL)

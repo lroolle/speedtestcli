@@ -57,13 +57,24 @@ func measureLatency(ctx context.Context, client HTTPDoer, baseURL, measID string
 	return &result, nil
 }
 
+func expectedSampleCount(steps []speedtest.TestStep) int {
+	n := 0
+	for _, s := range steps {
+		n += s.Count
+	}
+	return n
+}
+
 func measureDownload(ctx context.Context, client HTTPDoer, baseURL, measID string, steps []speedtest.TestStep, sink speedtest.EventSink) (*speedtest.ThroughputResult, error) {
 	var rawBps []uint64
 	var bytesTotal uint64
+	expected := expectedSampleCount(steps)
+	truncated := false
 
 	for _, step := range steps {
 		for range step.Count {
 			if ctx.Err() != nil {
+				truncated = true
 				break
 			}
 
@@ -110,6 +121,9 @@ func measureDownload(ctx context.Context, client HTTPDoer, baseURL, measID strin
 				},
 			})
 		}
+		if truncated {
+			break
+		}
 	}
 
 	if len(rawBps) == 0 {
@@ -117,16 +131,21 @@ func measureDownload(ctx context.Context, client HTTPDoer, baseURL, measID strin
 	}
 
 	result := speedtest.ComputeThroughputResult(rawBps, bytesTotal, false)
+	result.ExpectedSamples = expected
+	result.Truncated = len(rawBps) < expected
 	return &result, nil
 }
 
 func measureUpload(ctx context.Context, client HTTPDoer, baseURL, measID string, steps []speedtest.TestStep, sink speedtest.EventSink) (*speedtest.ThroughputResult, error) {
 	var rawBps []uint64
 	var bytesTotal uint64
+	expected := expectedSampleCount(steps)
+	truncated := false
 
 	for _, step := range steps {
 		for range step.Count {
 			if ctx.Err() != nil {
+				truncated = true
 				break
 			}
 
@@ -149,17 +168,18 @@ func measureUpload(ctx context.Context, client HTTPDoer, baseURL, measID string,
 			io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
 
+			// Use wall-clock total round-trip minus server processing.
+			// WroteRequest fires when Go hands bytes to the kernel buffer,
+			// not when they reach the server — using it inflates small uploads.
 			serverTiming := parseServerTiming(resp)
-			uploadDuration := rt.uploadDuration() - serverTiming
-			if uploadDuration <= 0 {
-				uploadDuration = rt.uploadDuration()
-			}
-			if uploadDuration <= 0 {
-				uploadDuration = time.Since(rt.start)
+			totalRoundTrip := time.Since(rt.start)
+			transferDuration := totalRoundTrip - serverTiming
+			if transferDuration <= 0 {
+				transferDuration = totalRoundTrip
 			}
 
 			requestBytes := step.Bytes + estimateRequestHeaderSize(req)
-			bps := uint64(math.Round(float64(requestBytes*8) / uploadDuration.Seconds()))
+			bps := uint64(math.Round(float64(requestBytes*8) / transferDuration.Seconds()))
 
 			rawBps = append(rawBps, bps)
 			bytesTotal += step.Bytes
@@ -172,10 +192,13 @@ func measureUpload(ctx context.Context, client HTTPDoer, baseURL, measID string,
 				Timing: speedtest.TimingTrace{
 					TTFB:         float64(rt.ttfb()) / float64(time.Millisecond),
 					ServerTiming: float64(serverTiming) / float64(time.Millisecond),
-					Total:        float64(time.Since(rt.start)) / float64(time.Millisecond),
+					Total:        float64(totalRoundTrip) / float64(time.Millisecond),
 					ConnReused:   rt.connReused,
 				},
 			})
+		}
+		if truncated {
+			break
 		}
 	}
 
@@ -184,6 +207,8 @@ func measureUpload(ctx context.Context, client HTTPDoer, baseURL, measID string,
 	}
 
 	result := speedtest.ComputeThroughputResult(rawBps, bytesTotal, false)
+	result.ExpectedSamples = expected
+	result.Truncated = len(rawBps) < expected
 	return &result, nil
 }
 

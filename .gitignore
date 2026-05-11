@@ -1,3 +1,4 @@
-speedtest
-speedtest-*
+/speedtest
+/speedtest-*
 dist/
+coverage.out

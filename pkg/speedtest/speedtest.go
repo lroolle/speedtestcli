@@ -18,10 +18,10 @@ type Runner struct {
 type RunnerOption func(*Runner)
 
 func WithBackend(b Backend) RunnerOption     { return func(r *Runner) { r.backends = []Backend{b} } }
-func WithBackends(bs []Backend) RunnerOption  { return func(r *Runner) { r.backends = bs } }
-func WithPlan(p TestPlan) RunnerOption        { return func(r *Runner) { r.plan = p } }
-func WithSink(s EventSink) RunnerOption       { return func(r *Runner) { r.sink = s } }
-func WithSequential(v bool) RunnerOption      { return func(r *Runner) { r.sequential = v } }
+func WithBackends(bs []Backend) RunnerOption { return func(r *Runner) { r.backends = bs } }
+func WithPlan(p TestPlan) RunnerOption       { return func(r *Runner) { r.plan = p } }
+func WithSink(s EventSink) RunnerOption      { return func(r *Runner) { r.sink = s } }
+func WithSequential(v bool) RunnerOption     { return func(r *Runner) { r.sequential = v } }
 
 func NewRunner(opts ...RunnerOption) *Runner {
 	r := &Runner{
@@ -182,7 +182,23 @@ func (r *Runner) RunAll(ctx context.Context) (*Report, error) {
 	}
 
 	report.DurationS = time.Since(start).Seconds()
+
+	allFailed := len(report.Results) > 0
+	for _, res := range report.Results {
+		if res.Status != "failed" {
+			allFailed = false
+			break
+		}
+	}
+	if len(report.Results) == 0 {
+		allFailed = true
+	}
+
 	EmitReport(r.sink, report)
+
+	if allFailed {
+		return report, fmt.Errorf("all backends failed")
+	}
 	return report, nil
 }
 
@@ -194,9 +210,9 @@ func detectProxy() *ProxyInfo {
 		return nil
 	}
 	return &ProxyInfo{
-		HTTPProxy:  httpProxy,
-		HTTPSProxy: httpsProxy,
-		AllProxy:   allProxy,
+		HTTPProxy:  RedactProxyURL(httpProxy),
+		HTTPSProxy: RedactProxyURL(httpsProxy),
+		AllProxy:   RedactProxyURL(allProxy),
 	}
 }
 

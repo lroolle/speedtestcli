@@ -33,7 +33,7 @@ func New(opts ...Option) *Backend {
 }
 
 func (b *Backend) Name() string        { return "ookla" }
-func (b *Backend) Granularity() string  { return "aggregate" }
+func (b *Backend) Granularity() string { return "aggregate" }
 
 func (b *Backend) FetchMeta(ctx context.Context) (*st.ConnectionInfo, error) {
 	user, err := b.client.FetchUserInfoContext(ctx)

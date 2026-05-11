@@ -12,12 +12,12 @@ import (
 var serverTimingRe = regexp.MustCompile(`cfRequestDuration;dur=([\d.]+)`)
 
 type requestTiming struct {
-	start         time.Time
-	connectDone   time.Time
-	tlsDone       time.Time
-	wroteRequest  time.Time
-	gotFirstByte  time.Time
-	connReused    bool
+	start        time.Time
+	connectDone  time.Time
+	tlsDone      time.Time
+	wroteRequest time.Time
+	gotFirstByte time.Time
+	connReused   bool
 }
 
 func (rt *requestTiming) ttfb() time.Duration {

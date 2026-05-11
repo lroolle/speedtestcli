@@ -11,16 +11,16 @@ import (
 )
 
 type metaResponse struct {
-	ClientIP     string `json:"clientIp"`
-	ASN          uint64 `json:"asn"`
-	ASOrg        string `json:"asOrganization"`
-	Country      string `json:"country"`
-	City         string `json:"city"`
-	Region       string `json:"region"`
-	PostalCode   string `json:"postalCode"`
-	Latitude     string `json:"latitude"`
-	Longitude    string `json:"longitude"`
-	Colo         coloResponse `json:"colo"`
+	ClientIP   string       `json:"clientIp"`
+	ASN        uint64       `json:"asn"`
+	ASOrg      string       `json:"asOrganization"`
+	Country    string       `json:"country"`
+	City       string       `json:"city"`
+	Region     string       `json:"region"`
+	PostalCode string       `json:"postalCode"`
+	Latitude   string       `json:"latitude"`
+	Longitude  string       `json:"longitude"`
+	Colo       coloResponse `json:"colo"`
 }
 
 type coloResponse struct {

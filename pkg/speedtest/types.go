@@ -1,27 +1,44 @@
 package speedtest
 
-import "time"
+import (
+	"net/url"
+	"time"
+)
 
 type Result struct {
-	ID          string           `json:"id"`
-	Timestamp   time.Time        `json:"timestamp"`
-	DurationS   float64          `json:"duration_s"`
-	Status      string           `json:"status"`
-	Backend     string           `json:"backend"`
-	Preset      string           `json:"preset"`
-	Granularity string           `json:"granularity"`
-	Connection  ConnectionInfo   `json:"connection"`
-	Latency     LatencyResult    `json:"latency"`
-	Download    ThroughputResult `json:"download"`
-	Upload      ThroughputResult `json:"upload"`
-	Errors      []string         `json:"errors,omitempty"`
-	ProxyDetected *ProxyInfo     `json:"proxy_detected,omitempty"`
+	ID            string           `json:"id"`
+	Timestamp     time.Time        `json:"timestamp"`
+	DurationS     float64          `json:"duration_s"`
+	Status        string           `json:"status"`
+	Backend       string           `json:"backend"`
+	Preset        string           `json:"preset"`
+	Granularity   string           `json:"granularity"`
+	Connection    ConnectionInfo   `json:"connection"`
+	Latency       LatencyResult    `json:"latency"`
+	Download      ThroughputResult `json:"download"`
+	Upload        ThroughputResult `json:"upload"`
+	Errors        []string         `json:"errors,omitempty"`
+	ProxyDetected *ProxyInfo       `json:"proxy_detected,omitempty"`
 }
 
 type ProxyInfo struct {
 	HTTPProxy  string `json:"http_proxy,omitempty"`
 	HTTPSProxy string `json:"https_proxy,omitempty"`
 	AllProxy   string `json:"all_proxy,omitempty"`
+}
+
+func RedactProxyURL(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "[set]"
+	}
+	if u.User != nil {
+		u.User = url.UserPassword("***", "***")
+	}
+	return u.String()
 }
 
 type Report struct {
@@ -32,15 +49,15 @@ type Report struct {
 }
 
 type ConnectionInfo struct {
-	ClientIP string  `json:"client_ip"`
-	ASN      uint64  `json:"asn"`
-	ASOrg    string  `json:"as_organization"`
-	Country  string  `json:"country"`
-	Region   string  `json:"region,omitempty"`
-	City     string  `json:"city"`
-	Latitude float64 `json:"latitude,omitempty"`
-	Longitude float64 `json:"longitude,omitempty"`
-	Colo     ColoInfo `json:"colo,omitempty"`
+	ClientIP  string   `json:"client_ip"`
+	ASN       uint64   `json:"asn"`
+	ASOrg     string   `json:"as_organization"`
+	Country   string   `json:"country"`
+	Region    string   `json:"region,omitempty"`
+	City      string   `json:"city"`
+	Latitude  float64  `json:"latitude,omitempty"`
+	Longitude float64  `json:"longitude,omitempty"`
+	Colo      ColoInfo `json:"colo,omitempty"`
 }
 
 type ColoInfo struct {
@@ -67,11 +84,13 @@ type LatencyStats struct {
 }
 
 type ThroughputResult struct {
-	BitsPerSec uint64          `json:"bits_per_sec"`
-	BytesTotal uint64          `json:"bytes_total"`
-	Samples    int             `json:"samples"`
-	Stats      ThroughputStats `json:"stats"`
-	RawBps     []uint64        `json:"raw_bps,omitempty"`
+	BitsPerSec      uint64          `json:"bits_per_sec"`
+	BytesTotal      uint64          `json:"bytes_total"`
+	Samples         int             `json:"samples"`
+	ExpectedSamples int             `json:"expected_samples,omitempty"`
+	Truncated       bool            `json:"truncated,omitempty"`
+	Stats           ThroughputStats `json:"stats"`
+	RawBps          []uint64        `json:"raw_bps,omitempty"`
 }
 
 type ThroughputStats struct {

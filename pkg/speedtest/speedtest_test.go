@@ -11,7 +11,7 @@ type mockBackend struct {
 }
 
 func (m *mockBackend) Name() string        { return m.name }
-func (m *mockBackend) Granularity() string  { return "per-sample" }
+func (m *mockBackend) Granularity() string { return "per-sample" }
 
 func (m *mockBackend) FetchMeta(ctx context.Context) (*ConnectionInfo, error) {
 	return &ConnectionInfo{

@@ -166,13 +166,23 @@ func runMulti(ctx context.Context, opts runOpts, backends []speedtest.Backend, p
 	)
 
 	report, err := runner.RunAll(ctx)
-	if err != nil && opts.verbose {
-		logStderr("partial error: %v", err)
-	}
 
 	if report != nil && len(report.Results) > 0 {
 		outputReport(opts.format, report)
-	} else if err != nil {
+		hasPartial := false
+		for _, r := range report.Results {
+			if r.Status == "partial" || r.Status == "failed" {
+				hasPartial = true
+				break
+			}
+		}
+		if hasPartial {
+			return fmt.Errorf("one or more backends returned non-ok status")
+		}
+		return nil
+	}
+
+	if err != nil {
 		outputError(opts.format, err)
 		return err
 	}

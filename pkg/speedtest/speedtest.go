@@ -13,6 +13,7 @@ type Runner struct {
 	plan       TestPlan
 	sink       EventSink
 	sequential bool
+	proxyMode  string
 }
 
 type RunnerOption func(*Runner)
@@ -22,6 +23,7 @@ func WithBackends(bs []Backend) RunnerOption { return func(r *Runner) { r.backen
 func WithPlan(p TestPlan) RunnerOption       { return func(r *Runner) { r.plan = p } }
 func WithSink(s EventSink) RunnerOption      { return func(r *Runner) { r.sink = s } }
 func WithSequential(v bool) RunnerOption     { return func(r *Runner) { r.sequential = v } }
+func WithProxyMode(m string) RunnerOption    { return func(r *Runner) { r.proxyMode = m } }
 
 func NewRunner(opts ...RunnerOption) *Runner {
 	r := &Runner{
@@ -49,6 +51,11 @@ func (r *Runner) runBackend(ctx context.Context, backend Backend, sink EventSink
 		defer cancel()
 	}
 
+	proxyMode := r.proxyMode
+	if proxyMode == "" {
+		proxyMode = ProxyModeSystem
+	}
+
 	result := &Result{
 		ID:          GenerateID(),
 		Timestamp:   start,
@@ -56,6 +63,7 @@ func (r *Runner) runBackend(ctx context.Context, backend Backend, sink EventSink
 		Backend:     backend.Name(),
 		Preset:      r.plan.Name,
 		Granularity: backend.Granularity(),
+		ProxyMode:   proxyMode,
 	}
 
 	if proxy := detectProxy(); proxy != nil {

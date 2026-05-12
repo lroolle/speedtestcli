@@ -3,6 +3,7 @@ package ooklabackend
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -20,6 +21,14 @@ type Option func(*Backend)
 
 func WithClient(c *stgo.Speedtest) Option {
 	return func(b *Backend) { b.client = c }
+}
+
+func WithDirect() Option {
+	return func(b *Backend) {
+		t := http.DefaultTransport.(*http.Transport).Clone()
+		t.Proxy = nil
+		b.client = stgo.New(stgo.WithDoer(&http.Client{Transport: t}))
+	}
 }
 
 func New(opts ...Option) *Backend {

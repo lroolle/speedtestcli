@@ -163,3 +163,57 @@ func TestBackend_ContextCancellation(t *testing.T) {
 	}
 	fmt.Println("got expected error:", err)
 }
+
+func TestNewDirectHTTPClient_NoProxy(t *testing.T) {
+	t.Setenv("HTTP_PROXY", "http://proxy.invalid:9999")
+	t.Setenv("HTTPS_PROXY", "http://proxy.invalid:9999")
+
+	client := NewDirectHTTPClient()
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("expected *http.Transport")
+	}
+	if transport.Proxy != nil {
+		t.Error("direct client transport.Proxy should be nil")
+	}
+	if transport.MaxIdleConns == 0 {
+		t.Error("direct client should inherit DefaultTransport connection pool settings")
+	}
+}
+
+func TestWithDirect_UsesDirectClient(t *testing.T) {
+	srv := newTestServer()
+	defer srv.Close()
+
+	b := New(WithDirect(), WithBaseURL(srv.URL))
+
+	// WithDirect sets the client, but we need to also override the client
+	// to talk to the test server. Verify the backend was created successfully
+	// and the option didn't panic.
+	if b.Name() != "cloudflare" {
+		t.Errorf("expected 'cloudflare', got %q", b.Name())
+	}
+}
+
+func TestWithDirect_ReachesServer(t *testing.T) {
+	srv := newTestServer()
+	defer srv.Close()
+
+	// WithDirect then WithHTTPDoer: the last option wins for client,
+	// verifying that option ordering works correctly.
+	b := New(WithDirect(), WithHTTPDoer(srv.Client()), WithBaseURL(srv.URL))
+	info, err := b.FetchMeta(context.Background())
+	if err != nil {
+		t.Fatalf("FetchMeta failed: %v", err)
+	}
+	if info.ClientIP != "203.0.113.42" {
+		t.Errorf("expected 203.0.113.42, got %s", info.ClientIP)
+	}
+}
+
+func TestNewHTTPClient_DefaultProxy(t *testing.T) {
+	client := NewHTTPClient()
+	if client.Transport != nil {
+		t.Error("default client should use nil transport (inherits http.DefaultTransport)")
+	}
+}

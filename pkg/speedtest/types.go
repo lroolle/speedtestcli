@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+const (
+	ProxyModeSystem = "system"
+	ProxyModeDirect = "direct"
+)
+
 type Result struct {
 	ID            string           `json:"id"`
 	Timestamp     time.Time        `json:"timestamp"`
@@ -13,6 +18,7 @@ type Result struct {
 	Backend       string           `json:"backend"`
 	Preset        string           `json:"preset"`
 	Granularity   string           `json:"granularity"`
+	ProxyMode     string           `json:"proxy_mode"`
 	Connection    ConnectionInfo   `json:"connection"`
 	Latency       LatencyResult    `json:"latency"`
 	Download      ThroughputResult `json:"download"`

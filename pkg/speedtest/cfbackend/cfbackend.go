@@ -17,6 +17,7 @@ type Option func(*Backend)
 func WithHTTPDoer(d HTTPDoer) Option { return func(b *Backend) { b.client = d } }
 func WithBaseURL(u string) Option    { return func(b *Backend) { b.baseURL = u } }
 func WithMeasID(id string) Option    { return func(b *Backend) { b.measID = id } }
+func WithDirect() Option             { return func(b *Backend) { b.client = NewDirectHTTPClient() } }
 
 func New(opts ...Option) *Backend {
 	b := &Backend{

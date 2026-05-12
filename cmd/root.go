@@ -29,6 +29,7 @@ type runOpts struct {
 	baseURL    string
 	noUpload   bool
 	noDownload bool
+	noProxy    bool
 	verbose    bool
 }
 
@@ -62,6 +63,7 @@ func bindFlags(cmd *cobra.Command, opts *runOpts) {
 	cmd.Flags().StringVar(&opts.baseURL, "base-url", "", "Override Cloudflare base URL")
 	cmd.Flags().BoolVar(&opts.noUpload, "no-upload", false, "Skip upload tests")
 	cmd.Flags().BoolVar(&opts.noDownload, "no-download", false, "Skip download tests")
+	cmd.Flags().BoolVar(&opts.noProxy, "no-proxy", false, "Bypass HTTP_PROXY/HTTPS_PROXY/ALL_PROXY env vars, connect directly")
 	cmd.Flags().BoolVar(&opts.verbose, "verbose", false, "Print log lines to stderr")
 }
 
@@ -101,6 +103,11 @@ func runSpeedtest(ctx context.Context, opts runOpts) error {
 		plan.Steps = filterSteps(plan.Steps, "upload")
 	}
 
+	proxyMode := speedtest.ProxyModeSystem
+	if opts.noProxy {
+		proxyMode = speedtest.ProxyModeDirect
+	}
+
 	backends := selectBackends(opts)
 	multi := len(backends) > 1
 
@@ -125,16 +132,17 @@ func runSpeedtest(ctx context.Context, opts runOpts) error {
 
 	sequential := opts.thorough
 	if multi {
-		return runMulti(ctx, opts, backends, plan, sink, sequential)
+		return runMulti(ctx, opts, proxyMode, backends, plan, sink, sequential)
 	}
-	return runSingle(ctx, opts, backends[0], plan, sink)
+	return runSingle(ctx, opts, proxyMode, backends[0], plan, sink)
 }
 
-func runSingle(ctx context.Context, opts runOpts, backend speedtest.Backend, plan speedtest.TestPlan, sink speedtest.EventSink) error {
+func runSingle(ctx context.Context, opts runOpts, proxyMode string, backend speedtest.Backend, plan speedtest.TestPlan, sink speedtest.EventSink) error {
 	runner := speedtest.NewRunner(
 		speedtest.WithBackend(backend),
 		speedtest.WithPlan(plan),
 		speedtest.WithSink(sink),
+		speedtest.WithProxyMode(proxyMode),
 	)
 
 	result, err := runner.Run(ctx)
@@ -157,12 +165,13 @@ func runSingle(ctx context.Context, opts runOpts, backend speedtest.Backend, pla
 	return nil
 }
 
-func runMulti(ctx context.Context, opts runOpts, backends []speedtest.Backend, plan speedtest.TestPlan, sink speedtest.EventSink, sequential bool) error {
+func runMulti(ctx context.Context, opts runOpts, proxyMode string, backends []speedtest.Backend, plan speedtest.TestPlan, sink speedtest.EventSink, sequential bool) error {
 	runner := speedtest.NewRunner(
 		speedtest.WithBackends(backends),
 		speedtest.WithPlan(plan),
 		speedtest.WithSink(sink),
 		speedtest.WithSequential(sequential),
+		speedtest.WithProxyMode(proxyMode),
 	)
 
 	report, err := runner.RunAll(ctx)
@@ -205,16 +214,24 @@ func selectBackends(opts runOpts) []speedtest.Backend {
 	if opts.baseURL != "" {
 		cfOpts = append(cfOpts, cfbackend.WithBaseURL(opts.baseURL))
 	}
+	if opts.noProxy {
+		cfOpts = append(cfOpts, cfbackend.WithDirect())
+	}
+
+	var ooklaOpts []ooklabackend.Option
+	if opts.noProxy {
+		ooklaOpts = append(ooklaOpts, ooklabackend.WithDirect())
+	}
 
 	switch strings.ToLower(opts.backend) {
 	case "cloudflare", "cf":
 		return []speedtest.Backend{cfbackend.New(cfOpts...)}
 	case "ookla", "speedtest.net":
-		return []speedtest.Backend{ooklabackend.New()}
+		return []speedtest.Backend{ooklabackend.New(ooklaOpts...)}
 	default:
 		return []speedtest.Backend{
 			cfbackend.New(cfOpts...),
-			ooklabackend.New(),
+			ooklabackend.New(ooklaOpts...),
 		}
 	}
 }
@@ -274,7 +291,7 @@ func outputError(format string, err error) {
 
 func printResult(r *speedtest.Result) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(w, "[%s]\t%s preset\n", r.Backend, r.Preset)
+	fmt.Fprintf(w, "[%s]\t%s preset, proxy_mode=%s\n", r.Backend, r.Preset, r.ProxyMode)
 
 	server := r.Connection.Colo.IATA
 	if server == "" {

@@ -305,3 +305,84 @@ func TestResult_StatusOk(t *testing.T) {
 		t.Errorf("expected no errors, got %v", result.Errors)
 	}
 }
+
+func TestRunner_ProxyModeDefault(t *testing.T) {
+	runner := NewRunner(
+		WithBackend(&mockBackend{name: "test"}),
+		WithPlan(QuickPlan),
+	)
+	result, err := runner.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+	if result.ProxyMode != ProxyModeSystem {
+		t.Errorf("expected proxy_mode %q, got %q", ProxyModeSystem, result.ProxyMode)
+	}
+}
+
+func TestRunner_ProxyModeDirect(t *testing.T) {
+	runner := NewRunner(
+		WithBackend(&mockBackend{name: "test"}),
+		WithPlan(QuickPlan),
+		WithProxyMode(ProxyModeDirect),
+	)
+	result, err := runner.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+	if result.ProxyMode != ProxyModeDirect {
+		t.Errorf("expected proxy_mode %q, got %q", ProxyModeDirect, result.ProxyMode)
+	}
+}
+
+func TestRunAll_ProxyModePropagated(t *testing.T) {
+	runner := NewRunner(
+		WithBackends([]Backend{
+			&mockBackend{name: "a"},
+			&mockBackend{name: "b"},
+		}),
+		WithPlan(QuickPlan),
+		WithProxyMode(ProxyModeDirect),
+		WithSequential(true),
+	)
+	report, err := runner.RunAll(context.Background())
+	if err != nil {
+		t.Fatalf("RunAll failed: %v", err)
+	}
+	for _, r := range report.Results {
+		if r.ProxyMode != ProxyModeDirect {
+			t.Errorf("backend %s: expected proxy_mode %q, got %q", r.Backend, ProxyModeDirect, r.ProxyMode)
+		}
+	}
+}
+
+func TestDetectProxy_NoEnv(t *testing.T) {
+	t.Setenv("HTTP_PROXY", "")
+	t.Setenv("HTTPS_PROXY", "")
+	t.Setenv("ALL_PROXY", "")
+	t.Setenv("http_proxy", "")
+	t.Setenv("https_proxy", "")
+	t.Setenv("all_proxy", "")
+
+	if p := detectProxy(); p != nil {
+		t.Errorf("expected nil proxy info, got %+v", p)
+	}
+}
+
+func TestDetectProxy_WithEnv(t *testing.T) {
+	t.Setenv("HTTP_PROXY", "http://127.0.0.1:7890")
+	t.Setenv("HTTPS_PROXY", "")
+	t.Setenv("ALL_PROXY", "")
+	t.Setenv("http_proxy", "")
+	t.Setenv("https_proxy", "")
+	t.Setenv("all_proxy", "")
+
+	p := detectProxy()
+	if p == nil {
+		t.Fatal("expected proxy info, got nil")
+	}
+	if p.HTTPProxy != "http://127.0.0.1:7890" {
+		t.Errorf("expected http://127.0.0.1:7890, got %q", p.HTTPProxy)
+	}
+}
+
